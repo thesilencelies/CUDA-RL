@@ -23,7 +23,7 @@ class MancalaAgent(ABC):
     self._opp = (player + 1) %2
     
   @abstractmethod
-  def decide(self, own_pots: list(int), opp_pots: list(int)) -> int:
+  def decide(self, own_pots: [int], opp_pots: [int]) -> int:
     pass
   
   
@@ -43,23 +43,23 @@ class MancalaAgent(ABC):
 
 #simple agent that only takes random moves
 class RandomAgent(MancalaAgent):
-  def decide(self, own_pots: list(int), opp_pots: list(int)) -> int:
+  def decide(self, own_pots: [int], opp_pots: [int]) -> int:
     while True:
-      rval = random.randint(0,len(own_pots))
+      rval = random.randint(0,len(own_pots) - 1 )
       if own_pots[rval] > 0:
         return rval
   
   
 #agent that plays according to a simple heuristic
 class HeuristicAgent(MancalaAgent):
-  def decide(self, own_pots: list(int), opp_pots: list(int)) -> int:
+  def decide(self, own_pots: [int], opp_pots: [int]) -> int:
     #check if any of your moves would give you another turn
     for i in range(len(own_pots)):
       if own_pots[i] + i == len(own_pots):
         return i
       
     #else return the rightmost non-empty pot
-    for i in range(len(own_pots) -1, 0, -1):
+    for i in range(len(own_pots) -1, -1, -1):
       if own_pots[i] > 0:
         return i
     
