@@ -1,0 +1,1 @@
+#GPUMancala project build file
