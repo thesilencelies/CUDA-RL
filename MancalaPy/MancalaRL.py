@@ -30,12 +30,12 @@ class RLAgent(magent.MancalaAgent):
     outBuffer.npits = self.npits
     outBuffer.Q[:] = self.Qspace.reshape(-1).tolist()
     
-    with open(self.save_path, "w") as f:
+    with open(self.save_path, "wb") as f:
       f.write(outBuffer.SerializeToString())
 
   def load(self):
     if os.path.exists(self.save_path):
-      with open(self.save_path, "r") as f:
+      with open(self.save_path, "rb") as f:
         inBuffer = rlProto.QAgent()
         inBuffer.ParseFromString(f.read())
         self.npits = inBuffer.npits
@@ -90,14 +90,17 @@ class RLAgent(magent.MancalaAgent):
     return rval
   
   def train(self, result : bool, learning_rate : float):
-    #update on the final action (which has a reward but optimal Q is assumed to be 0)
-    self.Qspace[self.move_history[-1]] = self.Qspace[self.move_history[-1]] + \
-      learning_rate * ((1 if result else 0) -self.Qspace[self.move_history[-1]])
+    #update on the final action (which has a reward but optimal Q is assumed to be 0
+    indexer = tuple(self.move_history[-1])
+    self.Qspace[indexer] = self.Qspace[indexer] +\
+      learning_rate * ((1 if result else 0) -self.Qspace[indexer])
       
     #update the other states
-    for i in range(2, len(self.move_history)):
-      self.Qspace[self.move_history[-i-1]] = self.Qspace[self.move_history[-i-1]] + \
-        learning_rate * (self.Qspace[self.move_history[-i]] -self.Qspace[self.move_history[-i-1]])
+    for i in range(1, len(self.move_history)):
+      curent_ind = tuple(self.move_history[-i-1])
+      next_ind = tuple(self.move_history[-i])
+      self.Qspace[curent_ind] = self.Qspace[curent_ind] + \
+        learning_rate * (self.gamma*self.Qspace[next_ind] -self.Qspace[curent_ind])
 
     self.move_history.clear()
       

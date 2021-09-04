@@ -77,6 +77,7 @@ class Game(tk.Frame):
       super(Game, self).__init__(master)
       self.width = 610
       self.height = 400
+      self.master = master
       self.canvas = tk.Canvas(self, bg='#bdc999',
                               width=self.width,
                               height=self.height)
@@ -89,9 +90,12 @@ class Game(tk.Frame):
       self.player1_turn = True
       self.score = None
       self.learning_rate = 0.001
-      self.num_games = 10000
-      self.save_period = 1000
+      self.num_games = 1000
+      self._game_count = 0
+      self.save_period = 100
       self.accumulated_results = [0,0,0]
+      self.repeated_mode = False
+      self.interval = 100
         
     def create_board(self, npits : int, nseeds : int):
       self.env =  menv.MancalaEnv(npits, nseeds)
@@ -130,11 +134,20 @@ class Game(tk.Frame):
       seed_counts = self.env._pots
       for p, s in zip(self.pits, seed_counts):
         p.draw_seeds(s)
-        
+    
+    def _toggle_repeated_mode(self):
+      self.repeated_mode =  not self.repeated_mode
+      self.interval = 5 if self.repeated_mode else 100
+      self.r_m_toggle.config(text = "repeat on" if self.repeated_mode else "repeat off")
+    
     def setup(self):      
       self.text = self.draw_text(300, 300, 'Press Space to start')
       self.canvas.focus_set()
       self.canvas.bind('<space>', lambda _: self.start_game())
+      self.r_m_toggle = tk.Button(self.master, text ="repeat off",
+                                  command = lambda: self._toggle_repeated_mode())
+      self.r_m_toggle.pack(pady=5)
+      
       #self.canvas.bind('<space>', lambda _: self.play_turn())
 
     def draw_text(self, x, y, text, size='16'):
@@ -147,6 +160,7 @@ class Game(tk.Frame):
       if self.player2_agent is None: return
       if self.score is not None : self.canvas.delete(self.score)
       if not self.env.is_game_over(): return
+      self._game_count = 0
       self.player1_agent.set_env(self.env)
       self.player1_agent.set_player(0)
       self.player2_agent.set_env(self.env)
@@ -156,6 +170,7 @@ class Game(tk.Frame):
       self.game_loop()
     
     def game_loop(self):
+      if self.score is not None : self.canvas.delete(self.score)
       if self.env.is_game_over():
         player1score = self.env.get_score(0)
         player2score = self.env.get_score(1)
@@ -175,28 +190,39 @@ class Game(tk.Frame):
         
         self.player1_agent.train(player1score > player2score, self.learning_rate)
         self.player2_agent.train(player2score > player1score, self.learning_rate)
-        if self.num_games > 0:
-          self.num_games += 1
-          #alternate the first turn
-          self.player1_turn = self.num_games % 2 == 0
-          self.after(100, self.start_game)
-        if self.num_games % self.save_period == 0:
-          self.player1_agent.save()
-          self.player2_agent.save()
+        if self.repeated_mode:
+          if self._game_count < self.num_games:
+            self._game_count += 1
+            #alternate the first turn
+            self.player1_turn = self._game_count % 2 == 0
+            self.env.start_game()
+            self.after(100, self.game_loop)
+          else:
+            print(f"final results {self.accumulated_results}")
+          if self._game_count % self.save_period == 0:
+            self.score = self.draw_text(300, 340, f"saving")
+            self.player1_agent.save()
+            self.player2_agent.save()
         return
           
       self.play_turn()
-      self.after(5, self.game_loop)
+      self.after(self.interval, self.game_loop)
 
 if __name__ == '__main__':
     root = tk.Tk()
     root.title('Mancala')
     game = Game(root)
-    game.create_board(4, 4)
+    #boards bigger than 3 make for too large a table right now
+    npits = 3
+    
+    game.create_board(npits, 3)
     #player1 = magent.RandomAgent()
-    player1 = mrl.RLAgent("../AIData/Tabular1.pb", 4, 0.1)
+    player1 = mrl.RLAgent(f"../AIData/Tabular{npits}_1.pb", npits, 0.1)
     player1.load()
-    player2 = magent.HeuristicAgent()
+    #player2 = magent.HeuristicAgent()
+    #player2 = magent.RandomAgent()
+    player2 = mrl.RLAgent(f"../AIData/Tabular{npits}_2.pb", npits, 0.1)
+    player2.load()
     game.setPlayer1Agent(player1)
     game.setPlayer2Agent(player2)
     game.setup()

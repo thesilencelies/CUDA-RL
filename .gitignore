@@ -1,3 +1,10 @@
+#build env/
+[Bb]uild/*
+
+#binary ai data
+*.pb
+
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
