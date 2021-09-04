@@ -30,7 +30,13 @@ class MancalaAgent(ABC):
   def train(self, result : bool, learning_rate : float):
     pass
   
+  @abstractmethod
+  def save(self):
+    pass
   
+  @abstractmethod
+  def load(self):
+    pass
   
   def take_move(self):
     has_turn = True
@@ -56,6 +62,12 @@ class RandomAgent(MancalaAgent):
   def train(self, result : bool, learning_rate : float):
     pass
   
+  def save(self):
+    pass
+  
+  def load(self):
+    pass
+  
   
 #agent that plays according to a simple heuristic
 class HeuristicAgent(MancalaAgent):
@@ -70,5 +82,11 @@ class HeuristicAgent(MancalaAgent):
       if own_pots[i] > 0:
         return i
   def train(self, result : bool, learning_rate : float):
+    pass
+  
+  def save(self):
+    pass
+  
+  def load(self):
     pass
     

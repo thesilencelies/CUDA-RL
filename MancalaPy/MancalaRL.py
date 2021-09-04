@@ -16,8 +16,8 @@ import random
 #format of the Qspace is empty, own, pool, opp, opp pool
 
 class RLAgent(magent.MancalaAgent):
-  def init(self, save_path, npits, epsilon):
-    super().init()
+  def __init__(self, save_path, npits, epsilon):
+    super().__init__()
     self.epsilon = epsilon
     self.save_path = save_path
     self.lr = 0.001
@@ -91,13 +91,13 @@ class RLAgent(magent.MancalaAgent):
   
   def train(self, result : bool, learning_rate : float):
     #update on the final action (which has a reward but optimal Q is assumed to be 0)
-    self.q_space[self.move_history[-1]] = self.q_space[self.move_history[-1]] + \
-      learning_rate * ((1 if result else 0) -self.q_space[self.move_history[-1]])
+    self.Qspace[self.move_history[-1]] = self.Qspace[self.move_history[-1]] + \
+      learning_rate * ((1 if result else 0) -self.Qspace[self.move_history[-1]])
       
     #update the other states
     for i in range(2, len(self.move_history)):
-      self.q_space[self.move_history[-i-1]] = self.q_space[self.move_history[-i-1]] + \
-        learning_rate * (self.q_space[self.move_history[-i]] -self.q_space[self.move_history[-i-1]])
+      self.Qspace[self.move_history[-i-1]] = self.Qspace[self.move_history[-i-1]] + \
+        learning_rate * (self.Qspace[self.move_history[-i]] -self.Qspace[self.move_history[-i-1]])
 
     self.move_history.clear()
       

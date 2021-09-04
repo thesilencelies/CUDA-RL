@@ -9,6 +9,7 @@ Mancala UI handling and base run script
 import tkinter as tk
 import MancalaEnv as menv
 import MancalaAgent as magent
+import MancalaRL as mrl
 
 #UI constants
 pit_width = 60
@@ -87,6 +88,10 @@ class Game(tk.Frame):
       self.player2_agent = None
       self.player1_turn = True
       self.score = None
+      self.learning_rate = 0.001
+      self.num_games = 10000
+      self.save_period = 1000
+      self.accumulated_results = [0,0,0]
         
     def create_board(self, npits : int, nseeds : int):
       self.env =  menv.MancalaEnv(npits, nseeds)
@@ -154,18 +159,43 @@ class Game(tk.Frame):
       if self.env.is_game_over():
         player1score = self.env.get_score(0)
         player2score = self.env.get_score(1)
-        print(f"game over\n score was {player1score} {player2score}")
-        self.score = self.draw_text(300, 340, f"Player 1 {player1score}\nPlayer 2 {player2score}")
+        
+        if player1score > player2score:
+          result = "player 1 wins" 
+          self.accumulated_results[0] += 1
+        elif player2score > player1score:
+          result = "player 2 wins" 
+          self.accumulated_results[1] += 1
+        else:
+          result = "draw"
+          self.accumulated_results[2] += 1
+        
+        print(f"game over - {result} \n score was {player1score} {player2score}")
+        self.score = self.draw_text(300, 340, f"{result}\n{player1score} - {player2score}")
+        
+        self.player1_agent.train(player1score > player2score, self.learning_rate)
+        self.player2_agent.train(player2score > player1score, self.learning_rate)
+        if self.num_games > 0:
+          self.num_games += 1
+          #alternate the first turn
+          self.player1_turn = self.num_games % 2 == 0
+          self.after(100, self.start_game)
+        if self.num_games % self.save_period == 0:
+          self.player1_agent.save()
+          self.player2_agent.save()
         return
+          
       self.play_turn()
-      self.after(250, self.game_loop)
+      self.after(5, self.game_loop)
 
 if __name__ == '__main__':
     root = tk.Tk()
     root.title('Mancala')
     game = Game(root)
     game.create_board(4, 4)
-    player1 = magent.RandomAgent()
+    #player1 = magent.RandomAgent()
+    player1 = mrl.RLAgent("../AIData/Tabular1.pb", 4, 0.1)
+    player1.load()
     player2 = magent.HeuristicAgent()
     game.setPlayer1Agent(player1)
     game.setPlayer2Agent(player2)
