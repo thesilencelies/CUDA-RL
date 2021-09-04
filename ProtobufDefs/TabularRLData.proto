@@ -1,0 +1,9 @@
+syntax = "proto3";
+
+package mancala;
+
+message QAgent {
+	int32 npits = 1;
+	int32 nseeds = 2;
+	repeated float Q = 3;
+}

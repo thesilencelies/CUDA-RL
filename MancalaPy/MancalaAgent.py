@@ -26,6 +26,11 @@ class MancalaAgent(ABC):
   def decide(self, own_pots: [int], opp_pots: [int]) -> int:
     pass
   
+  @abstractmethod
+  def train(self, result : bool, learning_rate : float):
+    pass
+  
+  
   
   def take_move(self):
     has_turn = True
@@ -45,9 +50,11 @@ class MancalaAgent(ABC):
 class RandomAgent(MancalaAgent):
   def decide(self, own_pots: [int], opp_pots: [int]) -> int:
     while True:
-      rval = random.randint(0,len(own_pots) - 1 )
+      rval = random.randrange(0,len(own_pots))
       if own_pots[rval] > 0:
         return rval
+  def train(self, result : bool, learning_rate : float):
+    pass
   
   
 #agent that plays according to a simple heuristic
@@ -62,4 +69,6 @@ class HeuristicAgent(MancalaAgent):
     for i in range(len(own_pots) -1, -1, -1):
       if own_pots[i] > 0:
         return i
+  def train(self, result : bool, learning_rate : float):
+    pass
     
