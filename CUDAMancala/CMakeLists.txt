@@ -23,6 +23,6 @@ set_target_properties( mancala
  
 add_executable(mancala_train train.cu)
  
-set_property(TARGET (mancala_train 
+set_property(TARGET mancala_train 
              PROPERTY CUDA_SEPARABLE_COMPILATION ON)
 target_link_libraries(mancala_train PRIVATE mancala)
