@@ -22,7 +22,9 @@ namespace mancalaCuda
     {
 		board_state state;
         int action;
+		// 1 for player1 win, -1 for player 2 win, -2 for draw, 0 otherwise
         int reward;
+		bool player;
     };
 
 
@@ -31,9 +33,14 @@ namespace mancalaCuda
 	{
 		private:
 		std::string name;
+
+		void parseBoardState(board_state & state, std::ostream & stream);
+
 		public:
 		RLagent();
 		
 		std::string GetName();
+
+		void TrainStep();
 	};
 }

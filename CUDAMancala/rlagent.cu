@@ -1,4 +1,5 @@
-#include "rlagent.hpp"
+#include "rlagent.cuh"
+#include <vector>
 
 namespace mancalaCuda
 {
@@ -6,72 +7,54 @@ namespace mancalaCuda
 every cuda block has it's own simulation of the game it's playing through
 each sim is just an array npits*2 + 2 large of ints plus a flag indicating who's turn it is
 */
-
-
-
-
-	__global__
-	bool take_turn(int i, int* pits, int action, bool & turnval)
+	__device__ bool take_turn(board_state bs, int action, bool & turnval)
 	{
         //parameters for the turn
-        int game_index = i*nPits_total;
-        int start_index = game_index + player*(nPits_player +1) + action;
-        int pool_index = (player + 1) *(nPits_player + 1) - 1;
+        int start_index = turnval*(nPits_player +1) + action;
+        int pool_index = (turnval + 1) *(nPits_player + 1) - 1;
         //take the turn
-        int beads = pits[start_index];
-        pits[start_index] = 0;
+        int beads = bs.pits[start_index];
+        bs.pits[start_index] = 0;
         int index = start_index;
         for (int j =0; j < beads; j++)
         {
             index ++;
             if (index >= nPits_total)
             {
-            index = game_index;
+                index = 0;
             }
-            pits[index] ++;
+            bs.pits[index] ++;
         }
         if (index != pool_index)
         {
-            turnval = !player;
+            turnval = !turnval;
         }
         //empty pot handling
-        if (pits[index] == 1 && index >= player*(nPits_player + 1) && index < pool_index)
+        if (bs.pits[index] == 1 && index >= turnval*(nPits_player + 1) && index < pool_index)
         {
-            int opp_index = (nPits_player * 2 - index) % nPits_total + game_index;
-            pits[pool_index] += pits[opp_index] + pits[index];
-            pits[opp_index] = 0;
-            pits[index] = 0;
+            int opp_index = (nPits_player * 2 - index) % nPits_total;
+            bs.pits[pool_index] += bs.pits[opp_index] + bs.pits[index];
+            bs.pits[opp_index] = 0;
+            bs.pits[index] = 0;
         }
-        //check if the game is over
-        bool player1empty = true;
-        bool player2empty = true;
+
         for(int j = 0; j < nPits_player; j++)
         {
-            if (pits[game_index +j] > 0)
+            if (bs.player1pits[j] > 0 || bs.player2pits[j] > 0)
             {
-            player1empty = false;
-            break;
+                return false;
             }
         }
-
-        for(int j = nPits_player + 1; j < nPits_player*2 + 1; j++)
-        {
-            if (pits[game_index +j] > 0)
-            {
-            player2empty = false;
-            break;
-            }
-        }
-        return player1empty || player2empty;
+        return true;
 	}
 
-    __global__ int chooseAction(int index, int* pits, bool player)
+    __device__ int chooseAction(board_state bs, bool player)
     {
         //for test just return first valid
-        int playerInd = index + player ? nPits_player + 1 : 0;
+        int playerInd = player ? nPits_player + 1 : 0;
         for(int i = 0; i < nPits_player; i++)
         {
-            if(pits[playerInd + index] > 0)
+            if(bs.pits[playerInd + i] > 0)
             {
                 return i;
             }
@@ -79,7 +62,7 @@ each sim is just an array npits*2 + 2 large of ints plus a flag indicating who's
         return 0;
     }
 
-    __global__ void playGame(int nsims, int nturns, turn_record * results)
+    __global__ void playGame(int num_sims, int nturns, turn_record * results)
     {
 		int run_index = blockIdx.x * blockDim.x + threadIdx.x;
 		int run_stride = blockDim.x * gridDim.x;
@@ -87,29 +70,71 @@ each sim is just an array npits*2 + 2 large of ints plus a flag indicating who's
 		{
             bool player = false;
             bool newgame = true;
-            int game_index = i*nPits_total;
+            board_state board;
             for(int t = 0; t < nturns; t++)
             {
                 if(newgame)
                 {
-                    for(int p = 0; p < nPits_total; p++)
+                    for(int p = 0; p < nPits_player; p++)
                     {
-                        pits[game_index + p] = (p + 1) % (nPits_player + 1) != 0 ? nSeeds : 0;
+                        board.player1pits[p] = nSeeds;
+                        board.player2pits[p] = nSeeds;
                     }
+                    board.player1pool = 0;
+                    board.player2pool = 0;
                     newgame = false;
                 }
 
-                  //if a game finishes start a new one, we can finish the sim mid step
-
-
+                results[nturns*i + t].state = board;
+                results[nturns*i + t].player = player;
+                 //if a game finishes start a new one, we can finish the sim mid step
+                int action = chooseAction(board, player);
+                newgame = take_turn(board, action, player);
+                results[nturns*i + t].action = action;
+                if(newgame)
+                {
+                    for(int p = 0; p < nPits_player; p++)
+                    {
+                        board.player1pool += board.player1pits[p];
+                        board.player2pool += board.player2pits[p];
+                    }
+                    results[nturns * i + t].reward = board.player1pool > board.player2pool ? 1 : 
+                                                (board.player1pool < board.player2pool ? -1 : -2);
+                }
+                else
+                {
+                   results[nturns*i + t].reward = 0;
+                }
             }
         }
     }
 
 
 
+    void RLagent::parseBoardState(board_state& state, std::ostream & stream)
+    {
+        stream << "    |";
+        for(int i = 0; i < nPits_player; i++)
+        {
+            stream << state.player1pits[i]  << "|"; 
+        }
+        stream << std::endl;
+        stream << " |" << state.player1pool << "| ";
+        for(int i = 0; i < nPits_player; i++)
+        {
+            stream << "  ";
+        }
+        stream << "|" << state.player2pool << "| ";
+        stream << std::endl;
+        stream << "    |";
+        for(int i = 0; i < nPits_player; i++)
+        {
+            stream << state.player2pits[i]  << "|"; 
+        }
+        stream << std::endl;
+    }
 
-	RLagent::RLagent()
+    RLagent::RLagent()
 	{
 		name = "rlagent";
 	}
@@ -118,4 +143,39 @@ each sim is just an array npits*2 + 2 large of ints plus a flag indicating who's
 	{
 		return name;
 	}
+
+
+
+    void RLagent::TrainStep()
+    {
+        int num_sims = 1000;
+        int num_turns = 100;
+
+        int num_records = num_sims*num_turns;
+        int record_size = num_records * sizeof(turn_record);
+
+        std::vector<turn_record> h_turnRecord(num_records);
+        
+        turn_record * d_turnRecord;
+        cudaMalloc(&d_turnRecord, record_size);
+        
+        int threadsPerBlock = 32;
+        int blocksPerGrid = (num_sims + threadsPerBlock - 1) / threadsPerBlock;
+
+        playGame<<<blocksPerGrid, threadsPerBlock>>>(num_sims, num_turns, d_turnRecord);
+
+        cudaMemcpy(h_turnRecord.data(), d_turnRecord, record_size, cudaMemcpyDeviceToHost);
+
+        cudaFree(d_turnRecord);
+
+        //print the game log for checks
+        for(int i = 0; i < num_turns; i++)
+        {
+            std::cout << "turn " << i << " action: " << h_turnRecord[i].action << " player: " <<
+                h_turnRecord[i].player << " reward: " << h_turnRecord[i].reward << std::endl;
+
+            parseBoardState(h_turnRecord[i].state, std::cout); 
+            std::cout << std::endl;
+        }
+    }
 }

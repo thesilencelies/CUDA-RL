@@ -1,5 +1,5 @@
 #include <iostream>
-#include "rlagent.hpp"
+#include "rlagent.cuh"
 
 using namespace mancalaCuda;
 int main(void)
@@ -7,4 +7,5 @@ int main(void)
 	RLagent testAgent;
 
 	std::cout << "hello world : " << testAgent.GetName() << std::endl;
+	testAgent.TrainStep();
 }
