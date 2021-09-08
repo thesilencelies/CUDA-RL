@@ -7,7 +7,7 @@ namespace mancalaCuda
 every cuda block has it's own simulation of the game it's playing through
 each sim is just an array npits*2 + 2 large of ints plus a flag indicating who's turn it is
 */
-	__device__ bool take_turn(board_state bs, int action, bool & turnval)
+	__device__ bool take_turn(board_state & bs, int action, bool & turnval)
 	{
         //parameters for the turn
         int start_index = turnval*(nPits_player +1) + action;
@@ -148,21 +148,23 @@ each sim is just an array npits*2 + 2 large of ints plus a flag indicating who's
 
     void RLagent::TrainStep()
     {
-        int num_sims = 1000;
-        int num_turns = 100;
+        int num_sims = 100000;
+        int num_turns = 200;
 
         int num_records = num_sims*num_turns;
         int record_size = num_records * sizeof(turn_record);
 
         std::vector<turn_record> h_turnRecord(num_records);
         
-        turn_record * d_turnRecord;
-        cudaMalloc(&d_turnRecord, record_size);
+       turn_record * d_turnRecord;
+       cudaMalloc(&d_turnRecord, record_size);
         
-        int threadsPerBlock = 32;
-        int blocksPerGrid = (num_sims + threadsPerBlock - 1) / threadsPerBlock;
+       int threadsPerBlock = 32;
+       int blocksPerGrid = (num_sims + threadsPerBlock - 1) / threadsPerBlock;
 
         playGame<<<blocksPerGrid, threadsPerBlock>>>(num_sims, num_turns, d_turnRecord);
+        //playGame(num_sims, num_turns, h_turnRecord.data());
+
 
         cudaMemcpy(h_turnRecord.data(), d_turnRecord, record_size, cudaMemcpyDeviceToHost);
 
