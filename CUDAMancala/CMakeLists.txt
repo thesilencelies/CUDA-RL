@@ -3,10 +3,13 @@
 cmake_minimum_required(VERSION 3.8 FATAL_ERROR)
 project(mancalaCUDA LANGUAGES CXX CUDA)
 
+#find_package(Protobuf REQUIRED)
  
 add_library(mancala STATIC
            rlagent.cu
            rlagent.cuh
+		   #Protobuf/TabularRLData.pb.cc
+		   #Protobuf/TabularRLData.pb.h
   )
  
 # Request that particles be built with -std=c++11

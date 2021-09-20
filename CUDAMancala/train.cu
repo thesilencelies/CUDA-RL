@@ -6,6 +6,6 @@ int main(void)
 {
 	RLagent testAgent;
 
-	std::cout << "hello world : " << testAgent.GetName() << std::endl;
+	std::cout << "running agent : " << testAgent.GetName() << std::endl;
 	testAgent.TrainStep();
 }
