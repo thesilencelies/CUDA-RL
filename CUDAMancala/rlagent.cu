@@ -1,6 +1,6 @@
 #include "rlagent.cuh"
-#include <vector>
 #include <sstream>
+#include <fstream>
 
 namespace mancalaCuda
 {
@@ -134,9 +134,19 @@ each sim is just an array npits*2 + 2 large of ints plus a flag indicating who's
         }
     }
 
+    __global__ void updateQVals(int num_sims, int nturns, const turn_record * results,float * QMat)
+    {
+		int run_index = blockIdx.x * blockDim.x + threadIdx.x;
+		int run_stride = blockDim.x * gridDim.x;
+		for (int i = run_index; i < num_sims; i += run_stride)
+		{
+            ///TODO
+        }
+    }
+
     //class functions
 
-    void RLagent::parseBoardState(board_state& state, std::ostream & stream)
+    void RLAgent::parseBoardState(board_state& state, std::ostream & stream)
     {
         stream << "    |";
         for(int i = 0; i < nPits_player; i++)
@@ -159,7 +169,7 @@ each sim is just an array npits*2 + 2 large of ints plus a flag indicating who's
         stream << std::endl;
     }
 
-    RLagent::RLagent(int num_sims = 10000, int num_turns = 200)
+    RLAgent::RLAgent(int num_sims, int num_turns)
 	{
 		name = "rlagent";
         this->num_sims = num_sims;
@@ -176,20 +186,20 @@ each sim is just an array npits*2 + 2 large of ints plus a flag indicating who's
         cudaMemcpy(d_Qvals, h_Qvals.data(), state_size, cudaMemcpyHostToDevice);
 	}
 
-    RLagent::~RLagent()
+    RLAgent::~RLAgent()
     {
         cudaFree(d_turnRecord);
         cudaFree(d_Qvals);
     }
 	
-	std::string RLagent::GetName()
+	std::string RLAgent::GetName()
 	{
 		return name;
 	}
 
 
 
-    void RLagent::RunStep()
+    void RLAgent::RunStep()
     {
        int threadsPerBlock = 32;
        int blocksPerGrid = (num_sims + threadsPerBlock - 1) / threadsPerBlock;
@@ -197,12 +207,17 @@ each sim is just an array npits*2 + 2 large of ints plus a flag indicating who's
         playGame<<<blocksPerGrid, threadsPerBlock>>>(num_sims, num_turns, d_turnRecord, d_Qvals );
     }
 
-    void RLagent::TrainStep()
-    {        
-        cudaMemcpy(h_Qvals.data(), d_Qvals, state_size, cudaMemcpyDeviceToHost);
+    void RLAgent::TrainStep()
+    {
+        
+       int threadsPerBlock = 32;
+       int blocksPerGrid = (num_sims + threadsPerBlock - 1) / threadsPerBlock;
+
+        updateQVals<<<blocksPerGrid, threadsPerBlock>>>(num_sims, num_turns, d_turnRecord, d_Qvals );
+
     }
 
-    std::string RLagent::PrintRun()
+    std::string RLAgent::PrintRun()
     {
         cudaMemcpy(h_turnRecord.data(), d_turnRecord, record_size, cudaMemcpyDeviceToHost);
         std::stringstream outStream;
@@ -215,5 +230,17 @@ each sim is just an array npits*2 + 2 large of ints plus a flag indicating who's
             outStream << std::endl;
         }
         return outStream.str();
+    }
+
+    void RLAgent::SaveQMat(std::string fileLoc)
+    {
+        cudaMemcpy(h_Qvals.data(), d_Qvals, state_size, cudaMemcpyDeviceToHost);
+        //TODO - use protobuf
+    }
+
+    void RLAgent::LoadQMat(std::string fileLoc)
+    {
+        //TODO
+        cudaMemcpy(d_Qvals, h_Qvals.data(), state_size, cudaMemcpyHostToDevice);
     }
 }

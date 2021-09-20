@@ -1,8 +1,9 @@
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
 
+#include <vector>
 #include <iostream>
-//#include "Protobuf/TabularRLData.pb.h"
+#include "Protobuf/TabularRLData.pb.h"
 
 namespace mancalaCuda
 {
@@ -34,7 +35,7 @@ namespace mancalaCuda
 
 
 
-	class RLagent
+	class RLAgent
 	{
 		private:
 		std::string name;
@@ -57,8 +58,8 @@ namespace mancalaCuda
 		void parseBoardState(board_state & state, std::ostream & stream);
 
 		public:
-		RLagent(int num_sims = 10000, int num_turns = 200);
-		~RLagent();
+		RLAgent(int num_sims = 10000, int num_turns = 200);
+		~RLAgent();
 		
 		std::string GetName();
 		

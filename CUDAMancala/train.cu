@@ -4,8 +4,11 @@
 using namespace mancalaCuda;
 int main(void)
 {
-	RLagent testAgent;
+	RLAgent testAgent;
 
 	std::cout << "running agent : " << testAgent.GetName() << std::endl;
-	testAgent.TrainStep();
+	testAgent.RunStep();
+	std::cout << "run1" << std::endl << testAgent.PrintRun();
+	testAgent.RunStep();
+	std::cout << "run2" << std::endl << testAgent.PrintRun();
 }
