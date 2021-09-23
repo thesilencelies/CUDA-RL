@@ -213,7 +213,7 @@ if __name__ == '__main__':
     root.title('Mancala')
     game = Game(root)
     #boards bigger than 3 make for too large a table right now
-    npits = 3
+    npits = 2
     
     game.create_board(npits, 3)
     #player1 = magent.RandomAgent()

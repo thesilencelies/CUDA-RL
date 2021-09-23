@@ -32,6 +32,9 @@ class RLAgent(magent.MancalaAgent):
     
     with open(self.save_path, "wb") as f:
       f.write(outBuffer.SerializeToString())
+      
+    with open(self.save_path[:-3] + "_human.pb", "w") as f:
+      f.write(str(outBuffer))
 
   def load(self):
     if os.path.exists(self.save_path):

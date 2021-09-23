@@ -1,9 +1,9 @@
+#pragma once
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
 
 #include <vector>
 #include <iostream>
-#include "Protobuf/TabularRLData.pb.h"
 
 namespace mancalaCuda
 {
@@ -70,5 +70,8 @@ namespace mancalaCuda
 
 		void SaveQMat(std::string fileLoc);
 		void LoadQMat(std::string fileLoc);
+
+		int GetMax(std::vector<int> values);
+
 	};
 }

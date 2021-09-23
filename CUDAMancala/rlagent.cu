@@ -1,3 +1,4 @@
+#include "Protobuf/TabularRLData.pb.h"
 #include "rlagent.cuh"
 #include <sstream>
 #include <fstream>
@@ -235,12 +236,82 @@ each sim is just an array npits*2 + 2 large of ints plus a flag indicating who's
     void RLAgent::SaveQMat(std::string fileLoc)
     {
         cudaMemcpy(h_Qvals.data(), d_Qvals, state_size, cudaMemcpyDeviceToHost);
-        //TODO - use protobuf
+        mancala::QAgent outputProt;
+        outputProt.set_npits(nPits_player);
+        outputProt.set_nseeds(nSeeds);
+        outputProt.mutable_q()->Add(h_Qvals.begin(), h_Qvals.end());
+        std::cout  << num_states << " "  << h_Qvals.size() << " "<< outputProt.mutable_q()->size();
+        std::ofstream file(fileLoc);
+        outputProt.SerializeToOstream(&file);
+        file.close();
     }
 
     void RLAgent::LoadQMat(std::string fileLoc)
     {
-        //TODO
-        cudaMemcpy(d_Qvals, h_Qvals.data(), state_size, cudaMemcpyHostToDevice);
+        std::ifstream file(fileLoc);
+        mancala::QAgent inputProt;
+        inputProt.ParseFromIstream(&file);
+        file.close();
+        if(inputProt.q().size() == num_states)
+        {
+            h_Qvals.assign(inputProt.q().begin(), inputProt.q().end());
+            cudaMemcpy(d_Qvals, h_Qvals.data(), state_size, cudaMemcpyHostToDevice);
+        }
+    }
+
+    __global__ void reduce0(int datalen, int *g_idata, int *g_odata) {
+        extern __shared__ int sdata[];
+        // each thread loads one element from global to shared mem
+        unsigned int tid = threadIdx.x;
+        unsigned int i = blockIdx.x*blockDim.x + threadIdx.x;
+        sdata[tid] = (i < datalen) ? g_idata[i] : INT_MIN;
+        __syncthreads();
+        // do reduction in shared mem
+        for(unsigned int s=1; s < blockDim.x; s *= 2) {
+            if (tid % (2*s) == 0) {
+                sdata[tid] = sdata[tid] > sdata[tid + s] ? sdata[tid] : sdata[tid + s];
+            }
+            __syncthreads();
+        }
+        // write result for this block to global mem
+        if (tid == 0) g_odata[blockIdx.x] = sdata[0];
+    }
+
+
+    //for practicing reduce
+    int RLAgent::GetMax(std::vector<int> values)
+    {
+        int dataSize = values.size()*sizeof(int);
+
+        int* d_values;
+        int* d_output;
+        cudaMalloc(&d_values, dataSize);
+        cudaMalloc(&d_output, dataSize);
+        cudaMemcpy(d_values, values.data(), dataSize, cudaMemcpyHostToDevice);
+        
+        int blockSize = 128;
+        for(int i = values.size(); i > 1; i = i/ blockSize + 1)
+        {
+            int nBlock = (i + blockSize - 1)/blockSize;
+             reduce0<<<nBlock, blockSize, blockSize*sizeof(int)>>>(i, d_values, d_output);
+            i = i/ blockSize + 1;
+            if(i > 1)
+            {
+                nBlock = (i + blockSize - 1)/blockSize;
+                reduce0<<<nBlock, blockSize, blockSize*sizeof(int)>>>(i, d_output, d_values);
+            }
+            else
+            {
+                cudaDeviceSynchronize();
+                cudaMemcpy(d_values, d_output, sizeof(int), cudaMemcpyDeviceToDevice);
+                cudaDeviceSynchronize();
+            }
+        }
+        int rval = -1;
+        cudaMemcpy( &rval, d_values,sizeof(int), cudaMemcpyDeviceToHost);
+        
+        cudaFree(d_values);
+        cudaFree(d_output);
+        return rval;
     }
 }
