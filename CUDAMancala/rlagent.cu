@@ -183,7 +183,12 @@ each sim is just an array npits*2 + 2 large of ints plus a flag indicating who's
         this->num_turns = num_turns;
         num_records = num_sims*num_turns;
         record_size = num_records * sizeof(turn_record);
-        num_states = nPits_player* pow(nPits_total +1, nPits_player*2);
+        num_states = nPits_player;
+        for(int j = 0; j < nPits_total -1; j++)
+        {
+            //apply the recursive sums - available states = (Sum)^j (n) => (n)(n+1)(n+2)etc/(i!)
+            num_states = (num_states*(nSeeds_total + 1 + j))/(j+1);
+        }
         state_size = num_states * sizeof(float);
 
         h_turnRecord.resize(num_records);

@@ -213,7 +213,7 @@ if __name__ == '__main__':
     root.title('Mancala')
     game = Game(root)
     #boards bigger than 3 make for too large a table right now
-    npits = 2
+    npits = 4
     nseeds = 3
     
     game.create_board(npits, nseeds)
