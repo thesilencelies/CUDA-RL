@@ -11,6 +11,26 @@ namespace mancalaCuda
 every cuda block has it's own simulation of the game it's playing through
 each sim is just an array npits*2 + 2 large of ints plus a flag indicating who's turn it is
 */
+
+    //not very fast, but allows a space effient representation of state
+    __device__ int getBoardIndex(board_state & bs)
+    {
+        int index = 0;
+        int remainingSeeds = nSeeds_total;
+        for(int i = nPits_total - 2; i >= 0; i--)
+        {
+            remainingSeeds -= bs.pits[i];
+            int maxAvoidedIndex = 1;
+            for(int j = 0; j < i; j++)
+            {
+                //apply the recursive sums - available states = (Sum)^j (n) => (n)(n+1)(n+2)etc/(i!)
+                maxAvoidedIndex = (maxAvoidedIndex*(remainingSeeds + j))/(j+1);
+            }
+            index += maxAvoidedIndex;
+        }
+        return index;
+    }
+
 	__device__ bool take_turn(board_state & bs, int action, bool & turnval)
 	{
         //parameters for the turn
@@ -52,23 +72,9 @@ each sim is just an array npits*2 + 2 large of ints plus a flag indicating who's
         return true;
 	}
 
-    __device__ int chooseAction(board_state bs, bool player, const float* QMat)
+    __device__ int chooseAction(board_state & bs, bool player, const float* QMat)
     {
-        int stateIndex = 0;
-        auto ownPits = player? bs.player2pits : bs.player1pits;
-        for(int i = 0 ; i < nPits_player; i++)
-        {
-            //0 state is the empty pit indicator
-            int pitIndex = (ownPits[i] == 0 ? 0 : (i + ownPits[i] % nPits_total) + 1);
-            stateIndex = stateIndex * nStates_pit + pitIndex;
-        }
-        auto oppPits = player? bs.player1pits : bs.player2pits;
-        for(int i = 0 ; i < nPits_player; i++)
-        {
-            int pitIndex = (oppPits[i] == 0 ? 0 : (i + oppPits[i] % nPits_total) + 1);
-            stateIndex = stateIndex * nStates_pit + pitIndex;
-        }
-        stateIndex = stateIndex * nPits_player;
+        int stateIndex = getBoardIndex(bs) * nPits_player;
         //explortation
         //start deterministic
         //choose based on Qmat

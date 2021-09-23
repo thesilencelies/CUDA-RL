@@ -214,14 +214,15 @@ if __name__ == '__main__':
     game = Game(root)
     #boards bigger than 3 make for too large a table right now
     npits = 2
+    nseeds = 3
     
-    game.create_board(npits, 3)
+    game.create_board(npits, nseeds)
     #player1 = magent.RandomAgent()
-    player1 = mrl.RLAgent(f"../AIData/Tabular{npits}_1.pb", npits, 0.1)
+    player1 = mrl.RLAgent(f"../AIData/Tabular{npits}_1.pb", npits, nseeds, 0.1)
     player1.load()
     #player2 = magent.HeuristicAgent()
     #player2 = magent.RandomAgent()
-    player2 = mrl.RLAgent(f"../AIData/Tabular{npits}_2.pb", npits, 0.1)
+    player2 = mrl.RLAgent(f"../AIData/Tabular{npits}_2.pb", npits, nseeds, 0.1)
     player2.load()
     game.setPlayer1Agent(player1)
     game.setPlayer2Agent(player2)

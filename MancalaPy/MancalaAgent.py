@@ -23,7 +23,7 @@ class MancalaAgent(ABC):
     self._opp = (player + 1) %2
     
   @abstractmethod
-  def decide(self, own_pots: [int], opp_pots: [int]) -> int:
+  def decide(self, own_pots: [int], opp_pots: [int], own_pool : int) -> int:
     pass
   
   @abstractmethod
@@ -44,9 +44,10 @@ class MancalaAgent(ABC):
       if self._env.is_game_over():
         return
       own_pots = self._env.get_pots(self._player)
+      own_pool = self._env.get_pool(self._player)
       opp_pots = self._env.get_pots(self._opp)
       
-      action = self.decide(own_pots, opp_pots)
+      action = self.decide(own_pots, opp_pots, own_pool)
       
       has_turn = self._env.take_turn(action, self._player)
       
@@ -54,7 +55,7 @@ class MancalaAgent(ABC):
 
 #simple agent that only takes random moves
 class RandomAgent(MancalaAgent):
-  def decide(self, own_pots: [int], opp_pots: [int]) -> int:
+  def decide(self, own_pots: [int], opp_pots: [int], own_pool : int) -> int:
     while True:
       rval = random.randrange(0,len(own_pots))
       if own_pots[rval] > 0:
@@ -71,7 +72,7 @@ class RandomAgent(MancalaAgent):
   
 #agent that plays according to a simple heuristic
 class HeuristicAgent(MancalaAgent):
-  def decide(self, own_pots: [int], opp_pots: [int]) -> int:
+  def decide(self, own_pots: [int], opp_pots: [int], own_pool : int) -> int:
     #check if any of your moves would give you another turn
     for i in range(len(own_pots)):
       if own_pots[i] + i == len(own_pots):

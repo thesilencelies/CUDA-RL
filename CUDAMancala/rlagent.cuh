@@ -11,6 +11,7 @@ namespace mancalaCuda
 	constexpr int nPits_total = (nPits_player + 1) * 2;
 	constexpr int nStates_pit = nPits_total + 1;
 	constexpr int nSeeds = 3;
+	constexpr int nSeeds_total = nSeeds*nPits_player*2;
 	
 	union board_state
 	{

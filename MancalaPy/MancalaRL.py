@@ -16,9 +16,10 @@ import random
 #format of the Qspace is empty, own, pool, opp, opp pool
 
 class RLAgent(magent.MancalaAgent):
-  def __init__(self, save_path, npits, epsilon):
+  def __init__(self, save_path, npits, nseeds, epsilon):
     super().__init__()
     self.epsilon = epsilon
+    self.nseeds = nseeds
     self.save_path = save_path
     self.lr = 0.001
     self.gamma = 0.99
@@ -29,12 +30,10 @@ class RLAgent(magent.MancalaAgent):
     outBuffer = rlProto.QAgent()
     outBuffer.npits = self.npits
     outBuffer.Q[:] = self.Qspace.reshape(-1).tolist()
+    outBuffer.nseeds = self.nseeds
     
     with open(self.save_path, "wb") as f:
       f.write(outBuffer.SerializeToString())
-      
-    with open(self.save_path[:-3] + "_human.pb", "w") as f:
-      f.write(str(outBuffer))
 
   def load(self):
     if os.path.exists(self.save_path):
@@ -42,32 +41,39 @@ class RLAgent(magent.MancalaAgent):
         inBuffer = rlProto.QAgent()
         inBuffer.ParseFromString(f.read())
         self.npits = inBuffer.npits
-        self.pit_state_count = self.npits*2 + 3
+        self.pit_state_count = self.npits*2 + 2
+        self.nseeds = inBuffer.nseeds
+        self.nseeds_total = self.nseeds*self.npits*2
         self.Qspace = np.array(inBuffer.Q)
-        self.Qspace = self.Qspace.reshape([self.pit_state_count for i in range(self.npits*2)] + [self.npits])
+        self.Qspace = self.Qspace.reshape([-1, self.npits])
 
   def set_npits(self, npits):
     self.npits = npits
-    self.pit_state_count = self.npits*2 + 3 # both players pits, pools and empty
-    self.Qspace = np.ones([self.pit_state_count for i in range(self.npits*2)] + [self.npits])
+    self.nseeds_total = self.nseeds*npits*2
+    self.pit_state_count = self.npits*2 + 2
+    # all zeros bar the final pit is the last entry
+    self.Qspace = np.ones([self.get_board_index([0]*self.pit_state_count) + 1, self.npits])
     
+    
+  #data is stored according to a tree starting with own pot left totally full  
+  def get_board_index(self, state : [int]) -> int:
+    index = 0
+    remSeeds = self.nseeds_total
+    for i in range(self.pit_state_count -2, -1, -1):
+        remSeeds = remSeeds - state[i]
+        maxAvoid = 1
+        for j in range(i):
+            maxAvoid = (maxAvoid*(remSeeds+j))/(j+1)
+        index += maxAvoid
+    return int(index)
 
-  def decide(self, own_pots: [int], opp_pots: [int]) -> int:
+
+  def decide(self, own_pots: [int], opp_pots: [int], own_pool : int) -> int:
     #get the right part of the (absurdly large) table
     #this large table is not efficient but it allows us to see the value of GPU bound work maybe
-    q_space = self.Qspace
-    move = []
-    for i in range(len(own_pots)):
-      #work out where the point goes
-      #handle the empty space case
-      dest = 0 if own_pots[i] == 0 else (i + own_pots[i]) % ((self.npits + 1)*2) + 1
-      q_space = q_space[dest]
-      move.append(dest)
-    
-    for i in range(len(opp_pots)):
-      dest = 0 if opp_pots[i] == 0 else (self.npits + 1 + i + opp_pots[i]) % ((self.npits + 1)*2) + 1
-      q_space = q_space[dest]
-      move.append(dest)
+    index = self.get_board_index(own_pots + [own_pool] +  opp_pots)
+    q_space = self.Qspace[index]
+    move = [index]
       
     #current q space is the npits options
     rval = -1
