@@ -259,20 +259,56 @@ each sim is just an array npits*2 + 2 large of ints plus a flag indicating who's
         }
     }
 
-    __global__ void reduce0(int datalen, int *g_idata, int *g_odata) {
+    template<unsigned int blockSize>
+    __device__ void warpReduceMax(volatile int * sdata, int tid)
+    {
+        if (blockSize >= 64) sdata[tid] = sdata[tid] > sdata[tid + 32] ? sdata[tid] : sdata[tid + 32];
+        if (blockSize >= 32) sdata[tid] = sdata[tid] > sdata[tid + 16] ? sdata[tid] : sdata[tid + 16];
+        if (blockSize >= 16) sdata[tid] = sdata[tid] > sdata[tid + 8] ? sdata[tid] : sdata[tid + 8];
+        if (blockSize >= 8) sdata[tid] = sdata[tid] > sdata[tid + 4] ? sdata[tid] : sdata[tid + 4];
+        if (blockSize >= 4) sdata[tid] = sdata[tid] > sdata[tid + 2] ? sdata[tid] : sdata[tid + 2];
+        if (blockSize >= 2) sdata[tid] = sdata[tid] > sdata[tid + 1] ? sdata[tid] : sdata[tid + 1];
+    }
+
+    template<unsigned int blockSize>
+    __global__ void reduceMax(int datalen, int *g_idata, int *g_odata) {
         extern __shared__ int sdata[];
         // each thread loads one element from global to shared mem
         unsigned int tid = threadIdx.x;
-        unsigned int i = blockIdx.x*blockDim.x + threadIdx.x;
-        sdata[tid] = (i < datalen) ? g_idata[i] : INT_MIN;
+        unsigned int i = blockIdx.x*(blockSize*2) + threadIdx.x;
+        unsigned int gridSize = blockSize*2*gridDim.x;
+        sdata[tid] = INT_MIN;
+
+        //serial reduction first until we come down to the grid size
+        while(i < datalen)
+        {
+            int a = g_idata[i];
+            sdata[tid] = sdata[tid] >  a ? sdata[tid] : a; 
+            i += gridSize;
+        }
         __syncthreads();
         // do reduction in shared mem
-        for(unsigned int s=1; s < blockDim.x; s *= 2) {
-            if (tid % (2*s) == 0) {
-                sdata[tid] = sdata[tid] > sdata[tid + s] ? sdata[tid] : sdata[tid + s];
-            }
+        if(blockSize >= 512) { 
+            if (tid < 256) { 
+            sdata[tid] = sdata[tid] > sdata[tid + 256] ? sdata[tid] : sdata[tid + 256];}
             __syncthreads();
         }
+        if(blockSize >= 256) { 
+            if (tid < 128) { 
+            sdata[tid] = sdata[tid] > sdata[tid + 128] ? sdata[tid] : sdata[tid + 128];}
+            __syncthreads();
+        }
+        if(blockSize >= 128) { 
+            if (tid < 64) { 
+            sdata[tid] = sdata[tid] > sdata[tid + 64] ? sdata[tid] : sdata[tid + 64];}
+            __syncthreads();
+        }
+
+        if(tid < 32)
+        {
+            warpReduceMax<blockSize>(sdata, tid);
+        }
+
         // write result for this block to global mem
         if (tid == 0) g_odata[blockIdx.x] = sdata[0];
     }
@@ -289,16 +325,19 @@ each sim is just an array npits*2 + 2 large of ints plus a flag indicating who's
         cudaMalloc(&d_output, dataSize);
         cudaMemcpy(d_values, values.data(), dataSize, cudaMemcpyHostToDevice);
         
-        int blockSize = 128;
+        constexpr int blockSize = 128;
+        constexpr int itemsPerThread = 128;
+
+        constexpr int itemsPerBlock = blockSize*itemsPerThread;
         for(int i = values.size(); i > 1; i = i/ blockSize + 1)
         {
-            int nBlock = (i + blockSize - 1)/blockSize;
-             reduce0<<<nBlock, blockSize, blockSize*sizeof(int)>>>(i, d_values, d_output);
+            int nBlock = (i + itemsPerBlock - 1)/(itemsPerBlock);
+             reduceMax<blockSize><<<nBlock, blockSize, blockSize*sizeof(int)>>>(i, d_values, d_output);
             i = i/ blockSize + 1;
             if(i > 1)
             {
-                nBlock = (i + blockSize - 1)/blockSize;
-                reduce0<<<nBlock, blockSize, blockSize*sizeof(int)>>>(i, d_output, d_values);
+                nBlock = (i + itemsPerBlock - 1)/(itemsPerBlock);
+                reduceMax<blockSize><<<nBlock, blockSize, blockSize*sizeof(int)>>>(i, d_output, d_values);
             }
             else
             {

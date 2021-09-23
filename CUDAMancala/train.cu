@@ -8,7 +8,7 @@ int main(void)
 
 	//reduction test
 	std::vector<int> reduceArray;
-	for(int i = 0; i < 10000; i++)
+	for(int i = 0; i < 1000000; i++)
 	{
 		reduceArray.push_back(i);
 	}
